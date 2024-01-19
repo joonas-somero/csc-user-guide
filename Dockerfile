@@ -5,7 +5,7 @@ LABEL maintainer="CSC Service Desk <servicedesk@csc.fi>"
 # These need to be owned and writable by the root group in OpenShift
 ENV ROOT_GROUP_DIRS='/var/run /var/log/nginx /var/lib/nginx'
 
-ARG repo_branch=master
+ARG repo_branch=Dockerfile-reorder
 
 COPY requirements.txt /tmp
 
@@ -24,7 +24,7 @@ RUN chgrp -R root ${ROOT_GROUP_DIRS} &&\
 
 COPY . /tmp
 
-RUN git clone --no-checkout https://github.com/CSCfi/csc-user-guide git_folder && \
+RUN git clone --no-checkout https://github.com/joonas-somero/csc-user-guide git_folder && \
     if [ -d ".git" ]; then rm -r .git; fi && \
     mv git_folder/.git . && \
     rm -r git_folder && \
