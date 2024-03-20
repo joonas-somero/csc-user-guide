@@ -1,8 +1,9 @@
 site_name: Docs CSC
-repo_url: "https://github.com/CSCfi/csc-user-guide/"
-repo_name: "CSCfi/csc-user-guide"
-site_url: "https://docs.csc.fi/"
+site_url: https://docs.csc.fi/
 site_description: Instructions and user guides for the CSC supercomputers, cloud services, storage and software, including FAQ and tutorials
+
+repo_name: CSCfi/csc-user-guide
+repo_url: https://github.com/CSCfi/csc-user-guide/
 
 extra:
   environment: !ENV [MKDOCS_ENV, "preview"]
