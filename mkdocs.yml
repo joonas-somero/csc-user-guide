@@ -100,7 +100,7 @@ theme:
   logo: assets/images/logo.png
   favicon: assets/images/logo.png
   icon:
-    repo: material/github
+    repo: material/git
     edit: material/pencil
   palette:
     scheme: csc
