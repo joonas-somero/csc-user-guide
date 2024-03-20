@@ -49,7 +49,6 @@ plugins:
         - apps/by_discipline.md
         - apps/by_system.md
         - apps/by_license.md
-  - section-index
   - redirects:
       redirect_maps:
         # deprecation:
@@ -103,7 +102,8 @@ theme:
   palette:
     scheme: csc
   font: false # No loading fonts from G****e
-#  features:
+  features:
+    - navigation.indexes
 #    - announce.dismiss
 
 extra_css:
