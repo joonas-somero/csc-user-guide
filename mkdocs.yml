@@ -4,6 +4,7 @@ site_description: Instructions and user guides for the CSC supercomputers, cloud
 
 repo_name: CSCfi/csc-user-guide
 repo_url: https://github.com/CSCfi/csc-user-guide/
+edit_uri: edit/master/docs/
 
 extra:
   environment: !ENV [MKDOCS_ENV, "preview"]
@@ -100,10 +101,12 @@ theme:
   favicon: assets/images/logo.png
   icon:
     repo: material/github
+    edit: material/pencil
   palette:
     scheme: csc
   font: false # No loading fonts from G****e
   features:
+    - content.action.edit
     - navigation.indexes
 #    - announce.dismiss
 
