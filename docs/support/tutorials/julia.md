@@ -1,5 +1,5 @@
 # Running Julia batch jobs on CSC clusters
-This tutorial contains examples for running various Julia batch jobs on CSC clusters.
+This tutorial contains examples for running various Julia batch jobs on Puhti, Mahti and LUMI clusters.
 
 [TOC]
 
@@ -206,24 +206,16 @@ proc_env = [
 ]
 
 # We add worker processes to the local node using LocalManager.
-addprocs(proc_num;
-         env=proc_env,
-         exeflags="--project=.")
+addprocs(proc_num; env=proc_env, exeflags="--project=.")
 
 # We use the `@everywhere` macro to include the task function in the worker processes.
 # We must call `@everywhere` after adding worker processes; otherwise the code won't be included in the new processes.
 @everywhere function task()
-    return (
-        id=myid(),
-        hostname=gethostname(),
-        pid=getpid(),
-        nthreads=Threads.nthreads(),
-        cputhreads=Sys.CPU_THREADS
-    )
+    return (worker=myid(), hostname=gethostname(), pid=getpid())
 end
 
 # We run the task function in each worker process.
-futures = [@spawnat id task() for id in workers()]
+futures = [@spawnat worker task() for worker in workers()]
 
 # Then, we fetch the output from the processes.
 outputs = fetch.(futures)
@@ -292,7 +284,7 @@ println.(outputs)
     ```
 
 
-### Single GPU
+### Multi-processing on multiple nodes
 We use the following directory structure and assume it is our working directory.
 
 ```text
@@ -302,114 +294,106 @@ We use the following directory structure and assume it is our working directory.
 └── script.jl     # Julia script
 ```
 
+An example of a `Project.toml` project file.
+
+```toml
+[deps]
+ClusterManagers = "34f1f09b-3a8b-5176-ab39-66d58a4d544e"
+Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+```
+
+An example of a `script.jl` code.
+
+```julia
+using Distributed
+using ClusterManagers
+
+# We set one worker process per core.
+proc_num = parse(Int, ENV["SLURM_NTASKS"])
+
+# Environment variables that we pass to the worker processes.
+# We set the thread count to one since each process uses one core.
+n = Threads.nthreads()
+proc_env = [
+    "JULIA_NUM_THREADS"=>"$n",
+    "JULIA_CPU_THREADS"=>"$n",
+    "OPENBLAS_NUM_THREADS"=>"$n",
+]
+
+# We add worker processes to the local node using SlurmManager
+addprocs(SlurmManager(proc_num); env=proc_env, exeflags="--project=.")
+
+# We use the `@everywhere` macro to include the task function in the worker processes.
+# We must call `@everywhere` after adding worker processes; otherwise the code won't be included in the new processes.
+@everywhere function task()
+    return (worker=myid(), hostname=gethostname(), pid=getpid())
+end
+
+# We run the task function in each worker process.
+futures = [@spawnat worker task() for worker in workers()]
+
+# Then, we fetch the output from the processes.
+outputs = fetch.(futures)
+
+# Remove processes after we are done.
+rmprocs.(workers())
+
+# Print the outputs of master and worker processes.
+println(task())
+println.(outputs)
+```
+
 === "Puhti"
-    An example of a `Project.toml` project file.
-
-    ```toml
-    [deps]
-    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
-    ```
-
-    An example of a `script.jl` code.
-
-    ```julia
-    using CUDA
-
-    A = rand(2^9, 2^9)
-    A_d = CuArray(A)
-    B_d = $A_d * $A_d
-    ```
-
     An example of a `batch.sh` batch script.
 
     ```bash
     #!/bin/bash
     #SBATCH --account=<project>
-    #SBATCH --partition=gpu
+    #SBATCH --partition=large
     #SBATCH --time=00:15:00
-    #SBATCH --nodes=1
-    #SBATCH --ntasks-per-node=1
-    #SBATCH --cpus-per-task=10
-    #SBATCH --gres=gpu:v100:1
-    #SBATCH --mem-per-cpu=8000
+    #SBATCH --nodes=2
+    #SBATCH --ntasks-per-node=2
+    #SBATCH --cpus-per-task=1
+    #SBATCH --mem-per-cpu=1000
 
     module load julia
-    module load julia-cuda
     julia --project=. -e 'using Pkg; Pkg.instantiate()'
     julia --project=. script.jl
     ```
 
 === "Mahti"
-    An example of a `Project.toml` project file.
-
-    ```toml
-    [deps]
-    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
-    ```
-
-    An example of a `script.jl` code.
-
-    ```julia
-    using CUDA
-
-    A = rand(2^9, 2^9)
-    A_d = CuArray(A)
-    B_d = $A_d * $A_d
-    ```
-
     An example of a `batch.sh` batch script.
 
     ```bash
     #!/bin/bash
     #SBATCH --account=<project>
-    #SBATCH --partition=gpusmall
+    #SBATCH --partition=medium
     #SBATCH --time=00:15:00
-    #SBATCH --nodes=1
-    #SBATCH --ntasks-per-node=1
-    #SBATCH --cpus-per-task=32
-    #SBATCH --gres=gpu:a100:1
-    #
+    #SBATCH --nodes=2
+    #SBATCH --ntasks-per-node=128
+    #SBATCH --cpus-per-task=1
+    #SBATCH --mem-per-cpu=0
 
     module load julia
-    module load julia-cuda
     julia --project=. -e 'using Pkg; Pkg.instantiate()'
     julia --project=. script.jl
     ```
 
 === "LUMI"
-    An example of a `Project.toml` project file.
-
-    ```toml
-    [deps]
-    AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
-    ```
-
-    An example of a `script.jl` code.
-
-    ```julia
-    using AMDGPU
-
-    A = rand(2^9, 2^9)
-    A_d = ROCArray(A)
-    B_d = $A_d * $A_d
-    ```
-
     An example of a `batch.sh` batch script.
 
     ```bash
     #!/bin/bash
     #SBATCH --account=<project>
-    #SBATCH --partition=small-g
+    #SBATCH --partition=standard
     #SBATCH --time=00:15:00
-    #SBATCH --nodes=1
-    #SBATCH --ntasks-per-node=1
-    #SBATCH --cpus-per-task=16
-    #SBATCH --gpus-per-node=1
-    #SBATCH --mem-per-cpu=1750
+    #SBATCH --nodes=2
+    #SBATCH --ntasks-per-node=128
+    #SBATCH --cpus-per-task=1
+    #SBATCH --mem-per-cpu=0
 
     module use /appl/local/csc/modulefiles
     module load julia
-    module load julia-amdgpu
     julia --project=. -e 'using Pkg; Pkg.instantiate()'
     julia --project=. script.jl
     ```
@@ -520,7 +504,7 @@ MPI.Barrier(comm)
     ```
 
 
-### Multi-processing on multiple nodes
+### Single GPU
 We use the following directory structure and assume it is our working directory.
 
 ```text
@@ -530,114 +514,192 @@ We use the following directory structure and assume it is our working directory.
 └── script.jl     # Julia script
 ```
 
-An example of a `Project.toml` project file.
-
-```toml
-[deps]
-ClusterManagers = "34f1f09b-3a8b-5176-ab39-66d58a4d544e"
-Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
-```
-
-An example of a `script.jl` code.
-
-```julia
-using Distributed
-using ClusterManagers
-
-# We set one worker process per core.
-proc_num = parse(Int, ENV["SLURM_NTASKS"])
-
-# Environment variables that we pass to the worker processes.
-# We set the thread count to one since each process uses one core.
-n = Threads.nthreads()
-proc_env = [
-    "JULIA_NUM_THREADS"=>"$n",
-    "JULIA_CPU_THREADS"=>"$n",
-    "OPENBLAS_NUM_THREADS"=>"$n",
-]
-
-# We add worker processes to the local node using SlurmManager
-addprocs(SlurmManager(proc_num);
-         env=proc_env,
-         exeflags="--project=.")
-
-# We use the `@everywhere` macro to include the task function in the worker processes.
-# We must call `@everywhere` after adding worker processes; otherwise the code won't be included in the new processes.
-@everywhere function task()
-    return (
-        id=myid(),
-        hostname=gethostname(),
-        pid=getpid(),
-        nthreads=Threads.nthreads(),
-        cputhreads=Sys.CPU_THREADS
-    )
-end
-
-# We run the task function in each worker process.
-futures = [@spawnat id task() for id in workers()]
-
-# Then, we fetch the output from the processes.
-outputs = fetch.(futures)
-
-# Remove processes after we are done.
-rmprocs.(workers())
-
-# Print the outputs of master and worker processes.
-println(task())
-println.(outputs)
-```
-
 === "Puhti"
+    An example of a `Project.toml` project file.
+
+    ```toml
+    [deps]
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+    ```
+
+    An example of a `script.jl` code.
+
+    ```julia
+    using CUDA
+
+    A = rand(2^9, 2^9)
+    A_d = CuArray(A)
+    B_d = A_d * A_d
+    ```
+
     An example of a `batch.sh` batch script.
 
     ```bash
     #!/bin/bash
     #SBATCH --account=<project>
-    #SBATCH --partition=large
+    #SBATCH --partition=gpu
     #SBATCH --time=00:15:00
-    #SBATCH --nodes=2
+    #SBATCH --nodes=1
     #SBATCH --ntasks-per-node=1
-    #SBATCH --cpus-per-task=1
-    #SBATCH --mem-per-cpu=1000
+    #SBATCH --cpus-per-task=10
+    #SBATCH --gres=gpu:v100:1
+    #SBATCH --mem-per-cpu=8000
 
     module load julia
+    module load julia-cuda
     julia --project=. -e 'using Pkg; Pkg.instantiate()'
     julia --project=. script.jl
     ```
 
 === "Mahti"
+    An example of a `Project.toml` project file.
+
+    ```toml
+    [deps]
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+    ```
+
+    An example of a `script.jl` code.
+
+    ```julia
+    using CUDA
+
+    A = rand(2^9, 2^9)
+    A_d = CuArray(A)
+    B_d = A_d * A_d
+    ```
+
     An example of a `batch.sh` batch script.
 
     ```bash
     #!/bin/bash
     #SBATCH --account=<project>
-    #SBATCH --partition=medium
+    #SBATCH --partition=gpusmall
     #SBATCH --time=00:15:00
-    #SBATCH --nodes=2
-    #SBATCH --ntasks-per-node=128
-    #SBATCH --cpus-per-task=1
-    #SBATCH --mem-per-cpu=0
+    #SBATCH --nodes=1
+    #SBATCH --ntasks-per-node=1
+    #SBATCH --cpus-per-task=32
+    #SBATCH --gres=gpu:a100:1
+    #
 
     module load julia
+    module load julia-cuda
     julia --project=. -e 'using Pkg; Pkg.instantiate()'
     julia --project=. script.jl
     ```
 
 === "LUMI"
+    An example of a `Project.toml` project file.
+
+    ```toml
+    [deps]
+    AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
+    ```
+
+    An example of a `script.jl` code.
+
+    ```julia
+    using AMDGPU
+
+    A = rand(2^9, 2^9)
+    A_d = ROCArray(A)
+    B_d = A_d * A_d
+    ```
+
     An example of a `batch.sh` batch script.
 
     ```bash
     #!/bin/bash
     #SBATCH --account=<project>
-    #SBATCH --partition=standard
+    #SBATCH --partition=small-g
+    #SBATCH --time=00:15:00
+    #SBATCH --nodes=1
+    #SBATCH --gpus-per-node=1
+    #SBATCH --ntasks-per-node=1
+    #SBATCH --cpus-per-task=8
+    #SBATCH --mem-per-cpu=1750
+
+    module use /appl/local/csc/modulefiles
+    module load julia
+    module load julia-amdgpu
+    julia --project=. -e 'using Pkg; Pkg.instantiate()'
+    julia --project=. script.jl
+    ```
+
+
+### Multi GPU with MPI
+We use the following directory structure and assume it is our working directory.
+
+```text
+.
+├── Project.toml  # Julia environment
+├── batch.sh      # Slurm batch script
+├── prog.jl       # Julia GPU-aware MPI program
+└── script.jl     # Julia script
+```
+
+An example of a `script.jl` code.
+
+```julia
+using MPI
+mpiexec(mpirun -> run(`$mpirun julia --project=. prog.jl`))
+```
+
+=== "LUMI"
+    An example of a `Project.toml` project file.
+
+    ```toml
+    [deps]
+    AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
+    MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+    ```
+
+    An example of a `prog.jl` code. ([source](https://gist.github.com/luraess/a47931d7fb668bd4348a2c730d5489f4))
+
+    ```julia
+    using MPI
+    using AMDGPU
+    MPI.Init()
+    comm = MPI.COMM_WORLD
+    rank = MPI.Comm_rank(comm)
+    # select device
+    comm_l = MPI.Comm_split_type(comm, MPI.COMM_TYPE_SHARED, rank)
+    rank_l = MPI.Comm_rank(comm_l)
+    device = AMDGPU.device_id!(rank_l+1)
+    gpu_id = AMDGPU.device_id(AMDGPU.device())
+    # select device
+    size = MPI.Comm_size(comm)
+    dst  = mod(rank+1, size)
+    src  = mod(rank-1, size)
+    println("rank=$rank rank_loc=$rank_l (gpu_id=$gpu_id - $device), size=$size, dst=$dst, src=$src")
+    N = 4
+    send_mesg = ROCArray{Float64}(undef, N)
+    recv_mesg = ROCArray{Float64}(undef, N)
+    fill!(send_mesg, Float64(rank))
+    AMDGPU.synchronize()
+    rank==0 && println("start sending...")
+    MPI.Sendrecv!(send_mesg, dst, 0, recv_mesg, src, 0, comm)
+    println("recv_mesg on proc $rank: $recv_mesg")
+    rank==0 && println("done.")
+    ```
+
+    An example of a `batch.sh` batch script.
+
+    ```bash
+    #!/bin/bash
+    #SBATCH --account=<project>
+    #SBATCH --partition=small-g
     #SBATCH --time=00:15:00
     #SBATCH --nodes=2
-    #SBATCH --ntasks-per-node=128
-    #SBATCH --cpus-per-task=1
+    #SBATCH --gpus-per-node=8
+    #SBATCH --ntasks-per-node=8
+    #SBATCH --cpus-per-task=8
     #SBATCH --mem-per-cpu=0
 
     module use /appl/local/csc/modulefiles
     module load julia
+    module load julia-mpi
+    module load julia-amdgpu
     julia --project=. -e 'using Pkg; Pkg.instantiate()'
     julia --project=. script.jl
     ```
