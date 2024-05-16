@@ -51,6 +51,7 @@ plugins:
         - apps/by_discipline.md
         - apps/by_system.md
         - apps/by_license.md
+  - section-index
   - redirects:
       redirect_maps:
         # deprecation:
@@ -107,7 +108,6 @@ theme:
   font: false # No loading fonts from G****e
   features:
     - content.action.edit
-    - navigation.indexes
 #    - announce.dismiss
 
 extra_css:
