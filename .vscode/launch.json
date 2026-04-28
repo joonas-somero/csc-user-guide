@@ -8,7 +8,7 @@
       "name": "MkDocs",
       "type": "debugpy",
       "request": "launch",
-      "program": "${userHome}/miniconda3/envs/docs-env/bin/mkdocs",
+      "program": "${userHome}/miniconda3/envs/docs-env/bin/properdocs",
       "args": ["serve"],
       "env": {"MKDOCS_ENV": "preview"},
       "console": "integratedTerminal"
@@ -17,7 +17,7 @@
       "name": "MkDocs with testing-hook",
       "type": "debugpy",
       "request": "launch",
-      "program": "${userHome}/miniconda3/envs/docs-env/bin/mkdocs",
+      "program": "${userHome}/miniconda3/envs/docs-env/bin/properdocs",
       "args": ["serve"],
       "env": {"MKDOCS_ENV": "test"},
       "console": "integratedTerminal"
